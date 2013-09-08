@@ -1,0 +1,7 @@
+把RemoteRobot文件夹放到一个全是英文路径的目录下
+打开cmake
+Where is the source code	选择RemoteRobot\VirtualReality\3dReconstruction\src
+Where to build the binaries	选择另一个全是英文路径的目录
+依次按Configure和Generate生成vs2010的工程
+编译之
+By boddmg@gmail.com QQ:307695032

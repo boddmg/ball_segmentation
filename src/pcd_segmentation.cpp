@@ -151,6 +151,37 @@ string getNowTimeStr()
 	return nowTime;
 }
 
+#define CLAMP_COLOR_VALUE(v) (v) = (v)/255;
+
+#define MAX(x,y) (x)>(y)?(x):(y)
+#define MIN(x,y) (x)<(y)?(x):(y)
+
+#define fequ(x,y,tol) ( ((x)*(1-(tol))<(y))&&((x)*(1+(tol))>(y)) )
+
+void RGB2HSL(float r, float g, float b,
+             float *h, float *s, float *l) {
+    CLAMP_COLOR_VALUE(r);
+    CLAMP_COLOR_VALUE(g);
+    CLAMP_COLOR_VALUE(b);
+    
+    float max, min, delta, sum;
+    max = MAX(r, MAX(g, b));
+    min = MIN(r, MIN(g, b));
+    delta = max - min;
+    sum = max + min;
+    
+    *l = sum / 2;           // Lightness
+    if (delta == 0) {       // No Saturation, so Hue is undefined (achromatic)
+        *h = *s = 0;
+        return;
+    }
+    *s = delta / (sum < 1 ? sum : 2 - sum);             // Saturation
+    if      (r == max) *h = (g - b) / delta / 6;        // color between y & m
+    else if (g == max) *h = (2 + (b - r) / delta) / 6;  // color between c & y
+    else               *h = (4 + (r - g) / delta) / 6;  // color between m & y
+    if (*h < 0) *h += 1;
+}
+
 int main (int argc, char** argv)
 {
 	uint32_t i=0;
@@ -167,7 +198,52 @@ int main (int argc, char** argv)
 		fileGrabber.setFileName(argv[1]);
 		fileGrabber.grab();
 		 
-		/*
+		cout<<getNowTimeStr()<<"Set fliter params"<<endl;
+		pcl::PointCloud<PointT> _cloud(fileGrabber.getPointCloud());
+		pcl::PointCloud<PointT> filteredCloud;
+
+		for (size_t i=0;i<_cloud.points.size();++i)
+		{
+			float h,s,l;
+			float tol=0.1;
+			RGB2HSL(_cloud.points[i].r,_cloud.points[i].g,_cloud.points[i].b,&h,&s,&l);
+			if(!fequ(h,60.0/360,0.1) )
+			{
+				_cloud.points[i].r=0;
+			}
+		}
+		cout<<getNowTimeStr()<<"color filter"<<endl;
+		cout<<_cloud.points.size()<<endl;
+		//过滤球的颜色以外的对象
+		pcl::ConditionAnd<PointT>::Ptr range_cond (new pcl::ConditionAnd<PointT> ());
+
+		range_cond->addComparison (pcl::PackedRGBComparison<PointT>::ConstPtr (new
+		  pcl::PackedRGBComparison<PointT> ("r", pcl::ComparisonOps::GT, 1)));
+
+		// build the filter
+		pcl::ConditionalRemoval<PointT> condrem (range_cond);
+		condrem.setInputCloud(_cloud.makeShared());
+		condrem.setKeepOrganized(false);
+		// apply filter
+		condrem.filter(filteredCloud);
+		cout<<getNowTimeStr()<<"over"<<endl;
+
+		cout<<filteredCloud.points.size()<<endl;
+		
+		cout<<getNowTimeStr()<<"RadiusOutlierRemoval"<<endl;
+		//过滤离群的点
+		pcl::RadiusOutlierRemoval<PointT> outrem(true);
+		// build the filter
+		outrem.setInputCloud(filteredCloud.makeShared());
+		outrem.setRadiusSearch(10);
+		outrem.setMinNeighborsInRadius (5);
+		outrem.setKeepOrganized(false);
+		// apply filter
+		outrem.filter (filteredCloud);
+
+		cout<<getNowTimeStr()<<"over"<<endl;
+		
+		
 		//Start to segmentation
 		pcl::SACSegmentation<PointT> seg; 
 		pcl::PointCloud<pcl::Normal>::Ptr cloud_normals;
@@ -183,7 +259,7 @@ int main (int argc, char** argv)
 		seg.setMaxIterations (100);
 		seg.setDistanceThreshold (5);
 		seg.setRadiusLimits (0, 100);
-		seg.setInputCloud (fileGrabber.getPointCloud().makeShared());
+		seg.setInputCloud (filteredCloud.makeShared());
 		cout<<getNowTimeStr()<<"Set segment params done...."<<endl;
 
 		cout<<getNowTimeStr()<<"Start segment"<<endl;
@@ -192,81 +268,13 @@ int main (int argc, char** argv)
 
 		cout<<getNowTimeStr()<<"Start extract"<<endl;
 
-		extract.setInputCloud (fileGrabber.getPointCloud().makeShared());
+		extract.setInputCloud (filteredCloud.makeShared());
 		extract.setIndices (inliers_sphere);
 		extract.setNegative (false);
-		extract.filter (*cloud_sphere);
+		extract.filter (filteredCloud);
 		cout<<getNowTimeStr()<<"Extract done....."<<endl;
-
-		cout<<getNowTimeStr()<<"Start extract"<<endl;
-		viewer.updateBGcloud(*cloud_sphere);
-		cout<<getNowTimeStr()<<"Extract done...."<<endl;
-		*/
-
-		cout<<getNowTimeStr()<<"Set fliter params"<<endl;
-		pcl::PointCloud<PointT> _cloud(fileGrabber.getPointCloud());
-		pcl::PointCloud<PointT> filteredCloud;
-
-		cout<<getNowTimeStr()<<"color filter"<<endl;
-		//过滤球的颜色以外的对象
-		pcl::ConditionAnd<PointT>::Ptr range_cond (new pcl::ConditionAnd<PointT> ());
-
-		range_cond->addComparison (pcl::PackedRGBComparison<PointT>::ConstPtr (new
-		  pcl::PackedRGBComparison<PointT> ("r", pcl::ComparisonOps::GT, 60)));
-
-		range_cond->addComparison (pcl::PackedRGBComparison<PointT>::ConstPtr (new
-			pcl::PackedRGBComparison<PointT> ("r", pcl::ComparisonOps::LT, 180)));
-
-		range_cond->addComparison (pcl::PackedRGBComparison<PointT>::ConstPtr (new
-		  pcl::PackedRGBComparison<PointT> ("g", pcl::ComparisonOps::GT, 60)));
-
-		range_cond->addComparison (pcl::PackedRGBComparison<PointT>::ConstPtr (new
-			pcl::PackedRGBComparison<PointT> ("g", pcl::ComparisonOps::LT, 180)));
-
-		range_cond->addComparison (pcl::PackedRGBComparison<PointT>::ConstPtr (new
-		  pcl::PackedRGBComparison<PointT> ("b", pcl::ComparisonOps::GT, 0)));
-
-		range_cond->addComparison (pcl::PackedRGBComparison<PointT>::ConstPtr (new
-			pcl::PackedRGBComparison<PointT> ("b", pcl::ComparisonOps::LT, 120)));
-
-		// build the filter
-		pcl::ConditionalRemoval<PointT> condrem (range_cond);
-		condrem.setInputCloud(_cloud.makeShared());
-		condrem.setKeepOrganized(false);
-		// apply filter
-		condrem.filter(filteredCloud);
-		cout<<getNowTimeStr()<<"over"<<endl;
-
-
-		cout<<getNowTimeStr()<<"RadiusOutlierRemoval"<<endl;
-		//过滤离群的点
-		/*
-		pcl::StatisticalOutlierRemoval<PointT> sor;
-		sor.setInputCloud (_cloud.makeShared());
-		sor.setMeanK (1);
-		sor.setStddevMulThresh (1.0);
-		cout<<getNowTimeStr()<<"start to filter"<<endl;
-		sor.filter (filteredCloud);
-		*/
-
-		pcl::RadiusOutlierRemoval<PointT> outrem(true);
-		// build the filter
-		outrem.setInputCloud(filteredCloud.makeShared());
-		outrem.setRadiusSearch(20);
-		outrem.setMinNeighborsInRadius (5);
-		outrem.setKeepOrganized(false);
-		// apply filter
-		outrem.filter (filteredCloud);
-
-		cout<<getNowTimeStr()<<"over"<<endl;
 		
 
-
-		/*
-		for(i=0;i<_cloud.points.size();++i)
-		{
-			_cloud.points[i].z=0;
-		}*/
 		viewer1.updateBGcloud(_cloud);
 		viewer2.updateBGcloud(filteredCloud);
 	}

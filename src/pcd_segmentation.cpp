@@ -232,7 +232,7 @@ int main (int argc, char** argv)
 		// build the filter
 		pcl::ConditionalRemoval<PointT> condrem (range_cond);
 		condrem.setInputCloud(_cloud.makeShared());
-		condrem.setKeepOrganized(true);
+		condrem.setKeepOrganized(false);
 		// apply filter
 		condrem.filter(filteredCloud);
 		cout<<getNowTimeStr()<<"over"<<endl;
@@ -251,10 +251,10 @@ int main (int argc, char** argv)
 
 		pcl::RadiusOutlierRemoval<PointT> outrem(true);
 		// build the filter
-		outrem.setInputCloud(_cloud.makeShared());
-		outrem.setRadiusSearch(1);
+		outrem.setInputCloud(filteredCloud.makeShared());
+		outrem.setRadiusSearch(20);
 		outrem.setMinNeighborsInRadius (5);
-		outrem.setNegative (true);
+		outrem.setKeepOrganized(false);
 		// apply filter
 		outrem.filter (filteredCloud);
 

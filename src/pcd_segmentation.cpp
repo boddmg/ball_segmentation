@@ -24,7 +24,7 @@
 #include <windows.h>
 #include <conio.h>
 #include <ctime> 
-
+#include <iomanip>
 
 using namespace std;
 
@@ -145,10 +145,15 @@ public:
 
 string getNowTimeStr()
 {
-	stringstream timeS;
-	timeS<<(uint64_t)time(NULL);
-	string nowTime(timeS.str());
-	return nowTime;
+	static DWORD lastTime=GetTickCount();
+	DWORD nowTime= GetTickCount();
+	stringstream stringBuilder;
+	stringBuilder<< nowTime;
+	stringBuilder<<"......";
+	stringBuilder<<setw(4)<<(nowTime-lastTime)<<"  ";
+	lastTime=nowTime;
+	string timeStr(stringBuilder.str());
+	return timeStr;
 }
 
 #define CLAMP_COLOR_VALUE(v) (v) = (v)/255;
@@ -181,7 +186,14 @@ void RGB2HSL(float r, float g, float b,
     else               *h = (4 + (r - g) / delta) / 6;  // color between m & y
     if (*h < 0) *h += 1;
 }
+class BallRecongnition
+{
+	pcl::PointCloud<PointT> inCloud;
+	void HSLfilter()
+	{
 
+	}
+};
 int main (int argc, char** argv)
 {
 	uint32_t i=0;
@@ -198,27 +210,29 @@ int main (int argc, char** argv)
 		fileGrabber.setFileName(argv[1]);
 		fileGrabber.grab();
 		 
-		cout<<getNowTimeStr()<<"Set fliter params"<<endl;
+		cout<<getNowTimeStr()<<"Start"<<endl;
+		cout<<getNowTimeStr()<<"color filter"<<endl;//debug
 		pcl::PointCloud<PointT> _cloud(fileGrabber.getPointCloud());
 		pcl::PointCloud<PointT> filteredCloud;
-
-		for (size_t i=0;i<_cloud.points.size();++i)
+		filteredCloud.empty();
+		//过滤球的颜色以外的对象
+		for (pcl::PointCloud<PointT>::iterator i=_cloud.begin();i!=_cloud.end();++i)
 		{
 			float h,s,l;
 			float tol=0.1;
-			RGB2HSL(_cloud.points[i].r,_cloud.points[i].g,_cloud.points[i].b,&h,&s,&l);
+			RGB2HSL(i->r,i->g,i->b,&h,&s,&l);
 			if(!fequ(h,60.0/360,0.1) )
 			{
-				_cloud.points[i].r=0;
+				i->r=0;
+				//filteredCloud.insert(filteredCloud.end(),*i);
 			}
 		}
-		cout<<getNowTimeStr()<<"color filter"<<endl;
-		cout<<_cloud.points.size()<<endl;
-		//过滤球的颜色以外的对象
+		cout<<"points size before filter"<<_cloud.points.size()<<endl;//debug
+		
 		pcl::ConditionAnd<PointT>::Ptr range_cond (new pcl::ConditionAnd<PointT> ());
 
 		range_cond->addComparison (pcl::PackedRGBComparison<PointT>::ConstPtr (new
-		  pcl::PackedRGBComparison<PointT> ("r", pcl::ComparisonOps::GT, 1)));
+			pcl::PackedRGBComparison<PointT> ("r", pcl::ComparisonOps::GT, 0)));
 
 		// build the filter
 		pcl::ConditionalRemoval<PointT> condrem (range_cond);
@@ -226,22 +240,21 @@ int main (int argc, char** argv)
 		condrem.setKeepOrganized(false);
 		// apply filter
 		condrem.filter(filteredCloud);
-		cout<<getNowTimeStr()<<"over"<<endl;
-
-		cout<<filteredCloud.points.size()<<endl;
 		
-		cout<<getNowTimeStr()<<"RadiusOutlierRemoval"<<endl;
+		cout<<"now filterd points size"<<filteredCloud.points.size()<<endl;//debug
+		
+		cout<<getNowTimeStr()<<"RadiusOutlierRemoval"<<endl;//debug
 		//过滤离群的点
 		pcl::RadiusOutlierRemoval<PointT> outrem(true);
 		// build the filter
 		outrem.setInputCloud(filteredCloud.makeShared());
-		outrem.setRadiusSearch(10);
+		outrem.setRadiusSearch(5);
 		outrem.setMinNeighborsInRadius (5);
 		outrem.setKeepOrganized(false);
 		// apply filter
 		outrem.filter (filteredCloud);
 
-		cout<<getNowTimeStr()<<"over"<<endl;
+		cout<<getNowTimeStr()<<"over"<<endl;//debug
 		
 		
 		//Start to segmentation
@@ -252,27 +265,44 @@ int main (int argc, char** argv)
 		pcl::ModelCoefficients::Ptr coefficients_sphere (new pcl::ModelCoefficients);
 		pcl::PointCloud<PointT>::Ptr cloud_sphere (new pcl::PointCloud<PointT> ());
 
-		cout<<getNowTimeStr()<<"Set segment params"<<endl;
+		cout<<getNowTimeStr()<<"Set segment params"<<endl;//debug
 		seg.setOptimizeCoefficients (true);
 		seg.setModelType (pcl::SACMODEL_SPHERE);
 		seg.setMethodType (pcl::SAC_RANSAC);
 		seg.setMaxIterations (100);
 		seg.setDistanceThreshold (5);
-		seg.setRadiusLimits (0, 100);
+		seg.setRadiusLimits (20, 40);
 		seg.setInputCloud (filteredCloud.makeShared());
-		cout<<getNowTimeStr()<<"Set segment params done...."<<endl;
+		cout<<getNowTimeStr()<<"Set segment params done...."<<endl;//debug
 
-		cout<<getNowTimeStr()<<"Start segment"<<endl;
+		cout<<getNowTimeStr()<<"Start segment"<<endl;//debug
 		seg.segment (*inliers_sphere, *coefficients_sphere);
-		cout<<getNowTimeStr()<<"Segment done...."<<endl;
+		cout<<getNowTimeStr()<<"Segment done...."<<endl;//debug
+		
 
-		cout<<getNowTimeStr()<<"Start extract"<<endl;
+		cout<<getNowTimeStr()<<"Start extract"<<endl;//debug
 
 		extract.setInputCloud (filteredCloud.makeShared());
 		extract.setIndices (inliers_sphere);
 		extract.setNegative (false);
 		extract.filter (filteredCloud);
-		cout<<getNowTimeStr()<<"Extract done....."<<endl;
+
+
+		cout<<"x:"<<coefficients_sphere->values[0]<<endl;//debug
+		cout<<"y:"<<coefficients_sphere->values[1]<<endl;//debug
+		cout<<"z:"<<coefficients_sphere->values[2]<<endl;//debug
+		cout<<"radius:"<<coefficients_sphere->values[3]<<endl;//debug
+
+		//画出球心
+		PointT *sphereCenter=new PointT();
+		sphereCenter->x=coefficients_sphere->values[0];
+		sphereCenter->y=coefficients_sphere->values[1];
+		sphereCenter->z=coefficients_sphere->values[2];
+		sphereCenter->rgb=0xffffff; 
+
+		filteredCloud.insert(filteredCloud.end() ,*sphereCenter);
+
+		cout<<getNowTimeStr()<<"Extract done....."<<endl;//debug
 		
 
 		viewer1.updateBGcloud(_cloud);

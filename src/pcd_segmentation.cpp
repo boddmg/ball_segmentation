@@ -221,26 +221,15 @@ int main (int argc, char** argv)
 			float h,s,l;
 			float tol=0.1;
 			RGB2HSL(i->r,i->g,i->b,&h,&s,&l);
-			if(!fequ(h,60.0/360,0.1) )
+			
+			if(fequ(h,60.0/360,0.1) && pcl::isFinite(*i))
 			{
-				i->r=0;
-				//filteredCloud.insert(filteredCloud.end(),*i);
+				//i->r=0;
+				filteredCloud.insert(filteredCloud.end(),*i);
 			}
 		}
 		cout<<"points size before filter"<<_cloud.points.size()<<endl;//debug
-		
-		pcl::ConditionAnd<PointT>::Ptr range_cond (new pcl::ConditionAnd<PointT> ());
 
-		range_cond->addComparison (pcl::PackedRGBComparison<PointT>::ConstPtr (new
-			pcl::PackedRGBComparison<PointT> ("r", pcl::ComparisonOps::GT, 0)));
-
-		// build the filter
-		pcl::ConditionalRemoval<PointT> condrem (range_cond);
-		condrem.setInputCloud(_cloud.makeShared());
-		condrem.setKeepOrganized(false);
-		// apply filter
-		condrem.filter(filteredCloud);
-		
 		cout<<"now filterd points size"<<filteredCloud.points.size()<<endl;//debug
 		
 		cout<<getNowTimeStr()<<"RadiusOutlierRemoval"<<endl;//debug

@@ -74,111 +74,9 @@ public:
 };
 
 
-//点云获取类
-class pointCloudGrabber
-{
-protected:
-	bool isUpdatedFlag;
-	pcl::PointCloud<PointT> cloud;
-	void tansform(pcl::PointCloud<PointT> &_cloud)
-	{
-		Eigen::Matrix4f transformMatrix;
-		transformMatrix<<
-			1000,0,0,0,
-			0,1000,0,0,
-			0,0,1000,0,
-			0,0,0,1
-			;
-		transformMatrix=pcl::getTransformation(0,0,0,0,0,M_PI).matrix()*transformMatrix;
-		pcl::transformPointCloud(_cloud,_cloud,transformMatrix);
-	}
-public:
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW 
-		pointCloudGrabber()
-	{
-		isUpdatedFlag=false;
-	}
-	//	virtual void grab()=0;
-
-	pcl::PointCloud<PointT> getPointCloud()
-	{
-		return cloud;
-	}
-
-
-	bool isUpdated()
-	{
-		if(isUpdatedFlag)
-		{
-			isUpdatedFlag=false;
-			return true;
-		}
-		return false;
-	}
-};
-
-//从文件获取点云，继承自pointCloudGrabber
-class FileGrabber:public pointCloudGrabber
-{
-private:
-	string fileName;
-public:
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW 
-		FileGrabber(string _fileName):fileName(_fileName)
-	{
-	}
-	FileGrabber()
-	{
-	}
-
-	void setFileName(string _fileName)
-	{
-		fileName=_fileName;
-	}
-
-	void grab()
-	{
-		pcl::io::loadPCDFile<PointT>(fileName,cloud);
-		isUpdatedFlag=true;
-	}
-};
-
-string getNowTimeStr()
-{
-	static DWORD lastTime=GetTickCount();
-	DWORD nowTime= GetTickCount();
-	stringstream stringBuilder;
-	stringBuilder<< nowTime;
-	stringBuilder<<"......";
-	stringBuilder<<setw(4)<<(nowTime-lastTime)<<"  ";
-	lastTime=nowTime;
-	string timeStr(stringBuilder.str());
-	return timeStr;
-}
-
-void debug_printf(string text)
-{
-	static bool firstOpen=true;
-	ofstream oFile("log.txt",ios::app);
-	string timeStr=getNowTimeStr();
-	if (firstOpen)
-	{
-		char time[128],date[128];
-		_strtime(time); 
-		_strdate(date); 
-		oFile<<"-------------------"<<date<<" "<<time<<"------------------"<<endl;//debug
-		firstOpen=false;
-	}
-	oFile<<timeStr<<text<<endl;//debug
-	cout<<timeStr<<text<<endl;//debug
-}
-
-
-
 #define MAX(x,y) (x)>(y)?(x):(y)
 #define MIN(x,y) (x)<(y)?(x):(y)
 
-//#define fequ(x,y,tol) ( ((x)*(1-(tol))<(y))&&((x)*(1+(tol))>(y)) )
 
 class BallRecongniter
 {
@@ -271,7 +169,169 @@ void CLAMP_COLOR_VALUE(float &v)
 		extract.filter (outCloud);
 	}
 
+	void getSphere(pcl::PointCloud<PointT> &inCloud,pcl::PointCloud<PointT> &outCloud,pcl::ModelCoefficients &coefficients_sphere)
+	{
+		FilterWithColorInHSL(inCloud,outCloud,0.1667,0.1);
+		FilterRemovalPointsWithRadius(outCloud,outCloud,5,5);
+		SphereSegmentation(outCloud,outCloud,coefficients_sphere);
+	}
 };
+
+//点云获取类
+class pointCloudGrabber
+{
+protected:
+	bool isUpdatedFlag;
+	pcl::PointCloud<PointT> cloud;
+	void tansform(pcl::PointCloud<PointT> &_cloud)
+	{
+		Eigen::Matrix4f transformMatrix;
+		transformMatrix<<
+			1000,0,0,0,
+			0,1000,0,0,
+			0,0,1000,0,
+			0,0,0,1
+			;
+		transformMatrix=pcl::getTransformation(0,0,0,0,0,M_PI).matrix()*transformMatrix;
+		pcl::transformPointCloud(_cloud,_cloud,transformMatrix);
+	}
+public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW 
+		pointCloudGrabber()
+	{
+		isUpdatedFlag=false;
+	}
+	//	virtual void grab()=0;
+
+	pcl::PointCloud<PointT> getPointCloud()
+	{
+		return cloud;
+	}
+
+
+	bool isUpdated()
+	{
+		if(isUpdatedFlag)
+		{
+			isUpdatedFlag=false;
+			return true;
+		}
+		return false;
+	}
+};
+
+//从Kinect获取点云，继承自pointCloudGrabber
+class KinectGrabber:public pointCloudGrabber
+{
+public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW 
+
+	RobotViewer robotViewer;
+	string path;
+	bool isSaving;
+
+	KinectGrabber()
+	{
+		isSaving=false;
+		pcl::Grabber* interface = new pcl::OpenNIGrabber();
+
+		boost::function<void (const pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr&)> f =
+		boost::bind (&KinectGrabber::kinect_callback, this, _1,interface);
+
+		interface->registerCallback (f);
+
+		interface->start();
+	}
+
+	void kinect_callback (const pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr &_cloud,pcl::Grabber* interface)
+	{
+//		Sleep(100);
+		cloud=*_cloud;
+		tansform(cloud);
+		if(isSaving==true)
+		{
+			isSaving=false;
+			saveAsPCDFile(path);
+		}
+
+		
+		pcl::PointCloud<PointT> sphere;
+		pcl::ModelCoefficients coefficients_sphere;
+		BallRecongniter ballRecongniter;
+		ballRecongniter.getSphere(cloud,sphere,coefficients_sphere);
+		robotViewer.viewer->updatePointCloud(sphere.makeShared(),"kinect");
+	}
+
+	void saveAsPCDFile(string _path)
+	{
+		pcl::PCDWriter writer;
+		writer.writeBinaryCompressed(_path,cloud);
+	}
+	 
+	void grab(string _path)
+	{
+		path=_path;
+		isSaving=true;
+	}
+};
+
+//从文件获取点云，继承自pointCloudGrabber
+class FileGrabber:public pointCloudGrabber
+{
+private:
+	string fileName;
+public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW 
+		FileGrabber(string _fileName):fileName(_fileName)
+	{
+	}
+	FileGrabber()
+	{
+	}
+
+	void setFileName(string _fileName)
+	{
+		fileName=_fileName;
+	}
+
+	void grab()
+	{
+		pcl::io::loadPCDFile<PointT>(fileName,cloud);
+		isUpdatedFlag=true;
+	}
+};
+
+string getNowTimeStr()
+{
+	static DWORD lastTime=GetTickCount();
+	DWORD nowTime= GetTickCount();
+	stringstream stringBuilder;
+	stringBuilder<< nowTime;
+	stringBuilder<<"......";
+	stringBuilder<<setw(4)<<(nowTime-lastTime)<<"  ";
+	lastTime=nowTime;
+	string timeStr(stringBuilder.str());
+	return timeStr;
+}
+
+void debug_printf(string text)
+{
+	static bool firstOpen=true;
+	ofstream oFile("log.txt",ios::app);
+	string timeStr=getNowTimeStr();
+	if (firstOpen)
+	{
+		char time[128],date[128];
+		_strtime(time); 
+		_strdate(date); 
+		oFile<<"-------------------"<<date<<" "<<time<<"------------------"<<endl;//debug
+		firstOpen=false;
+	}
+	oFile<<timeStr<<text<<endl;//debug
+	cout<<timeStr<<text<<endl;//debug
+}
+
+
 
 int main (int argc, char** argv)
 {
@@ -279,47 +339,30 @@ int main (int argc, char** argv)
 	KinectMotors m_kinectMotors;		//OpenNI_Motor.cpp里的用来控制kinect转角的类
 	m_kinectMotors.Open();
 	m_kinectMotors.Move(0);				//控制转角，安全范围：-60~60度，0度为水平
-	FileGrabber fileGrabber;
-	RobotViewer viewer1;
-	RobotViewer viewer2;
+//	FileGrabber fileGrabber;
+//	RobotViewer viewer1;
+//	RobotViewer viewer2;
 	stringstream stringBuilder;
-	BallRecongniter ballRecongniter;
+//	BallRecongniter ballRecongniter;
+	KinectGrabber kinectGrabber;      
+	/*
 	if(argc>=2)
 	{
 		fileGrabber.setFileName(argv[1]);
 		fileGrabber.grab();
 		debug_printf(argv[1]);
 		debug_printf("Start");
-		debug_printf("color filter");//debug
 
 		pcl::PointCloud<PointT> _cloud(fileGrabber.getPointCloud());
 		pcl::PointCloud<PointT> filteredCloud;
+		pcl::ModelCoefficients coefficients_sphere;
 
-		ballRecongniter.FilterWithColorInHSL(_cloud,filteredCloud,0.1667,0.1);
 		stringBuilder<<"points size before filtering:"<<_cloud.points.size()<<endl;//debug
 		debug_printf(stringBuilder.str());
 		stringBuilder.str("");
 		stringBuilder.clear();
-
+		ballRecongniter.getSphere(_cloud,filteredCloud,coefficients_sphere);
 		stringBuilder<<"points size after filtering:"<<filteredCloud.points.size()<<endl;//debug
-		debug_printf(stringBuilder.str());
-		stringBuilder.str("");
-		stringBuilder.clear();
-
-		debug_printf("RadiusOutlierRemoval");//debug
-
-		//过滤离群的点
-		ballRecongniter.FilterRemovalPointsWithRadius(filteredCloud,filteredCloud,5,5);
-		debug_printf("over");//debug		
-		stringBuilder<<"points size after filtering:"<<filteredCloud.points.size()<<endl;//debug
-		debug_printf(stringBuilder.str());
-		stringBuilder.str("");
-		stringBuilder.clear();
-
-		//Start to segmentation
-		pcl::ModelCoefficients coefficients_sphere;
-		ballRecongniter.SphereSegmentation(filteredCloud,filteredCloud,coefficients_sphere);
-		stringBuilder<<"radius:"<<coefficients_sphere.values[3]<<endl;//debug
 		debug_printf(stringBuilder.str());
 		stringBuilder.str("");
 		stringBuilder.clear();
@@ -333,17 +376,21 @@ int main (int argc, char** argv)
 
 		filteredCloud.insert(filteredCloud.end() ,sphereCenter);
 
-		debug_printf("Extract done.....");//debug
+		debug_printf("done.....");//debug
 
 
 		viewer1.updateBGcloud(_cloud);
 		viewer2.updateBGcloud(filteredCloud);
-	}
+	}else
+	{
 
+	}
+	*/
 	while(true)
 	{
-		viewer1.spinOnce();
-		viewer2.spinOnce();
+		kinectGrabber.robotViewer.viewer->spinOnce();
+//		viewer1.spinOnce();
+//		viewer2.spinOnce();
 		if(kbhit())
 		{
 			switch (getch())

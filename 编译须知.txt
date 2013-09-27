@@ -1,7 +1,26 @@
-��RemoteRobot�ļ��зŵ�һ��ȫ��Ӣ��·����Ŀ¼��
-��cmake
-Where is the source code	ѡ��RemoteRobot\VirtualReality\3dReconstruction\src
-Where to build the binaries	ѡ����һ��ȫ��Ӣ��·����Ŀ¼
-���ΰ�Configure��Generate����vs2010�Ĺ���
-����֮
+把本文件夹放到一个全是英文路径的目录下
+打开pcd_segmentation.cpp
+找到Filter with color in HSL这句话所在的那一行：
+
+FilterWithColorInHSL(inCloud,outCloud,0.1667,0.1);//Filter with color in HSL
+
+FilterWithColorInHSL这个函数是使用HSL域的颜色，即HUE的值进行滤波的函数，
+其原型为FilterWithColorInHSL(输入点云，输出点云，色相值 hue，范围 tol)
+作用是把 颜色不符合 hue*(1-tol) < 目标点的hue值 < hue*(1+tol) 的点去掉
+
+如果对你的小球识别效果不好就把 0.1667 换成你的小球的颜色，具体快速得到这个值的方法是：
+1.使用QQ截图功能，得到你的kinect采集的图像里的小球的RGB的颜色
+2.使用chrome浏览器打开 chrome-extension://fjphfihfjambfacmkdbeamlommleaeon/Color-Creator.html
+3.输入相应的RGB换算得到HUE值
+4.把HUE单位化，即HUE除以360
+
+得到的值就是要作为函数的参数的hue值
+时间不足，所以没有进一步做了，以上只是权宜之计
+进一步的是要使用鼠标点击然后自动把所点的区域直接抠出来
+
+打开cmake
+Where is the source code	选择旁边的\src 目录
+Where to build the binaries	选择另一个全是英文路径的目录
+依次按Configure和Generate生成vs2010的工程
+编译之
 By boddmg@gmail.com QQ:307695032

@@ -30,12 +30,12 @@ using namespace std;
 
 typedef pcl::PointXYZRGB PointT;
 
-//»úĞµ±ÛÏÔÊ¾Àà
+//æœºæ¢°è‡‚æ˜¾ç¤ºç±»
 class RobotViewer
 {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW 
-		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;//ÏÔÊ¾´°¿ÚµÄÖÇÄÜÖ¸Õë
+		boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;//æ˜¾ç¤ºçª—å£çš„æ™ºèƒ½æŒ‡é’ˆ
 	RobotViewer()
 	{
 		// ------------------------------------
@@ -47,18 +47,18 @@ public:
 
 		viewerTemp->setBackgroundColor (0, 0, 0);
 
-		pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgb(point_cloud_ptr);						//´´½¨Ò»¸ö¿Õ°×µÄµãÔÆ,²¢È¡µÃ
+		pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgb(point_cloud_ptr);						//åˆ›å»ºä¸€ä¸ªç©ºç™½çš„ç‚¹äº‘,å¹¶å–å¾—
 
 		viewerTemp->addPointCloud<PointT> (point_cloud_ptr, rgb, "kinect");
 		viewerTemp->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "kinect");
 
 
-		Eigen::Affine3f transform;									//±ä»»ÓÃ·ÂÉä¾ØÕó
+		Eigen::Affine3f transform;									//å˜æ¢ç”¨ä»¿å°„çŸ©é˜µ
 		std::vector< pcl::visualization::Camera > cameras;
 
 		viewerTemp->addCoordinateSystem(100.0);
 		viewerTemp->initCameraParameters();
-		viewerTemp->setCameraPosition(0,0,-2500,0,1,0);				//Ïà»úÎ»×Ë±ä»»
+		viewerTemp->setCameraPosition(0,0,-2500,0,1,0);				//ç›¸æœºä½å§¿å˜æ¢
 		viewer=viewerTemp;
 	}
 
@@ -119,7 +119,7 @@ void CLAMP_COLOR_VALUE(float &v)
 
 	void FilterWithColorInHSL(pcl::PointCloud<PointT> &inCloud,pcl::PointCloud<PointT> &outCloud,float inH,float inTol)
 	{
-		//¹ıÂËÇòµÄÑÕÉ«ÒÔÍâµÄ¶ÔÏó
+		//è¿‡æ»¤çƒçš„é¢œè‰²ä»¥å¤–çš„å¯¹è±¡
 		for (pcl::PointCloud<PointT>::iterator i=inCloud.begin();i!=inCloud.end();++i)
 		{
 			float h,s,l;
@@ -171,13 +171,13 @@ void CLAMP_COLOR_VALUE(float &v)
 
 	void getSphere(pcl::PointCloud<PointT> &inCloud,pcl::PointCloud<PointT> &outCloud,pcl::ModelCoefficients &coefficients_sphere)
 	{
-		FilterWithColorInHSL(inCloud,outCloud,0.1667,0.1);
+		FilterWithColorInHSL(inCloud,outCloud,0.1667,0.1);//Filter with color in HSL
 		FilterRemovalPointsWithRadius(outCloud,outCloud,5,5);
 		SphereSegmentation(outCloud,outCloud,coefficients_sphere);
 	}
 };
 
-//µãÔÆ»ñÈ¡Àà
+//ç‚¹äº‘è·å–ç±»
 class pointCloudGrabber
 {
 protected:
@@ -220,7 +220,7 @@ public:
 	}
 };
 
-//´ÓKinect»ñÈ¡µãÔÆ£¬¼Ì³Ğ×ÔpointCloudGrabber
+//ä»Kinectè·å–ç‚¹äº‘ï¼Œç»§æ‰¿è‡ªpointCloudGrabber
 class KinectGrabber:public pointCloudGrabber
 {
 public:
@@ -275,7 +275,7 @@ public:
 	}
 };
 
-//´ÓÎÄ¼ş»ñÈ¡µãÔÆ£¬¼Ì³Ğ×ÔpointCloudGrabber
+//ä»æ–‡ä»¶è·å–ç‚¹äº‘ï¼Œç»§æ‰¿è‡ªpointCloudGrabber
 class FileGrabber:public pointCloudGrabber
 {
 private:
@@ -336,79 +336,32 @@ void debug_printf(string text)
 int main (int argc, char** argv)
 {
 	uint32_t i=0;
-	KinectMotors m_kinectMotors;		//OpenNI_Motor.cppÀïµÄÓÃÀ´¿ØÖÆkinect×ª½ÇµÄÀà
+	KinectMotors m_kinectMotors;		//OpenNI_Motor.cppé‡Œçš„ç”¨æ¥æ§åˆ¶kinectè½¬è§’çš„ç±»
 	m_kinectMotors.Open();
-	m_kinectMotors.Move(0);				//¿ØÖÆ×ª½Ç£¬°²È«·¶Î§£º-60~60¶È£¬0¶ÈÎªË®Æ½
-//	FileGrabber fileGrabber;
-//	RobotViewer viewer1;
-//	RobotViewer viewer2;
+	m_kinectMotors.Move(0);				//æ§åˆ¶è½¬è§’ï¼Œå®‰å…¨èŒƒå›´ï¼š-60~60åº¦ï¼Œ0åº¦ä¸ºæ°´å¹³
 	stringstream stringBuilder;
-//	BallRecongniter ballRecongniter;
 	KinectGrabber kinectGrabber;      
-	/*
-	if(argc>=2)
-	{
-		fileGrabber.setFileName(argv[1]);
-		fileGrabber.grab();
-		debug_printf(argv[1]);
-		debug_printf("Start");
-
-		pcl::PointCloud<PointT> _cloud(fileGrabber.getPointCloud());
-		pcl::PointCloud<PointT> filteredCloud;
-		pcl::ModelCoefficients coefficients_sphere;
-
-		stringBuilder<<"points size before filtering:"<<_cloud.points.size()<<endl;//debug
-		debug_printf(stringBuilder.str());
-		stringBuilder.str("");
-		stringBuilder.clear();
-		ballRecongniter.getSphere(_cloud,filteredCloud,coefficients_sphere);
-		stringBuilder<<"points size after filtering:"<<filteredCloud.points.size()<<endl;//debug
-		debug_printf(stringBuilder.str());
-		stringBuilder.str("");
-		stringBuilder.clear();
-
-		//»­³öÇòĞÄ
-		PointT sphereCenter;
-		sphereCenter.x=coefficients_sphere.values[0];
-		sphereCenter.y=coefficients_sphere.values[1];
-		sphereCenter.z=coefficients_sphere.values[2];
-		sphereCenter.rgb=0xffffff; 
-
-		filteredCloud.insert(filteredCloud.end() ,sphereCenter);
-
-		debug_printf("done.....");//debug
-
-
-		viewer1.updateBGcloud(_cloud);
-		viewer2.updateBGcloud(filteredCloud);
-	}else
-	{
-
-	}
-	*/
 	while(true)
 	{
 		kinectGrabber.robotViewer.viewer->spinOnce();
-//		viewer1.spinOnce();
-//		viewer2.spinOnce();
 		if(kbhit())
 		{
 			switch (getch())
 			{
 			case 32:
 				{
-					//¿Õ¸ñ¼ü
+					//ç©ºæ ¼é”®
 				}break;
 
 			case 27:
 				{
 					return 0;
-					//ESC¼ü
+					//ESCé”®
 				}break;
 
 			case 13:
 				{
-					//»Ø³µ¼ü
+					//å›è½¦é”®
 				}break;
 
 			}

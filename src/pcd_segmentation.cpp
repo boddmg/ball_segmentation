@@ -171,7 +171,7 @@ void CLAMP_COLOR_VALUE(float &v)
 
 	void getSphere(pcl::PointCloud<PointT> &inCloud,pcl::PointCloud<PointT> &outCloud,pcl::ModelCoefficients &coefficients_sphere)
 	{
-		FilterWithColorInHSL(inCloud,outCloud,0.1667,0.1);//Filter with color in HSL
+		FilterWithColorInHSL(inCloud,outCloud,0.1667,0.1);//Filter with color in HSL. To change the color, change the params of the function.
 		FilterRemovalPointsWithRadius(outCloud,outCloud,5,5);
 		SphereSegmentation(outCloud,outCloud,coefficients_sphere);
 	}
